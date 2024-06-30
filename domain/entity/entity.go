@@ -1,13 +1,11 @@
 package entity
 
 import (
-	"Basic-Trade-API/domain/dto"
-	"github.com/go-playground/validator/v10"
+	"github.com/asaskevich/govalidator"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 	"time"
 )
-
-var validate = validator.New()
 
 type Variant struct {
 	ID          uint      `gorm:"primary_key;auto_increment" json:"id"`
@@ -39,89 +37,28 @@ type Admin struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func NewAdmin(dto dto.AdminDTO) (*Admin, error) {
-	adminUUID, err := uuid.Parse(dto.UUID)
-	if err != nil {
-		return nil, err
+func (variant *Variant) BeforeCreate(trx *gorm.DB) (err error) {
+	_, errorCreate := govalidator.ValidateStruct(variant)
+	if errorCreate != nil {
+		err = errorCreate
 	}
-
-	a := &Admin{
-		ID:        0,
-		UUID:      adminUUID,
-		Name:      dto.Name,
-		Email:     dto.Email,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err = a.ValidateAdminStruct()
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
+	return
 }
 
-func NewProduct(dto dto.ProductDTO) (*Product, error) {
-	adminID, err := uuid.Parse(dto.AdminID)
-	if err != nil {
-		return nil, err
+func (admin *Admin) BeforeCreate(trx *gorm.DB) (err error) {
+	_, errorCreate := govalidator.ValidateStruct(admin)
+	if errorCreate != nil {
+		err = errorCreate
+		return
 	}
-
-	productUUID, err := uuid.Parse(dto.UUID)
-	if err != nil {
-		return nil, err
-	}
-
-	a := &Product{
-		ID:        0,
-		UUID:      productUUID,
-		Name:      dto.Name,
-		ImageURL:  dto.ImageURL,
-		AdminID:   adminID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err = a.ValidateProductStruct()
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
+	return
 }
 
-func NewVariant(dto dto.VariantDTO) (*Variant, error) {
-	variantId, err := uuid.Parse(dto.UUID)
-	if err != nil {
-		return nil, err
+func (product *Product) BeforeCreate(trx *gorm.DB) (err error) {
+	_, errorCreate := govalidator.ValidateStruct(product)
+	if errorCreate != nil {
+		err = errorCreate
+		return
 	}
-
-	productId, err := uuid.Parse(dto.ProductID)
-	if err != nil {
-		return nil, err
-	}
-
-	a := &Variant{
-		ID:          0,
-		UUID:        variantId,
-		VariantName: dto.VariantName,
-		Quantity:    dto.Quantity,
-		ProductID:   productId,
-		CreatedAt:   time.Time{},
-		UpdatedAt:   time.Time{},
-	}
-	err = a.ValidateVariantStruct()
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
-}
-
-func (a *Admin) ValidateAdminStruct() error {
-	return validate.Struct(a)
-}
-
-func (a *Product) ValidateProductStruct() error {
-	return validate.Struct(a)
-}
-
-func (a *Variant) ValidateVariantStruct() error {
-	return validate.Struct(a)
+	return
 }
