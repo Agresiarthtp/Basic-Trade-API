@@ -3,8 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"os"
 )
+
+var DB *gorm.DB
 
 type AllConfiguration struct {
 	Port        string
