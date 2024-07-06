@@ -16,18 +16,20 @@ type Claims struct {
 }
 
 func GenerateToken(email string, id uint) (tokenString string, err error) {
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &JWTClaim{
-		Email: email,
-		ID:    id,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
+	// Create token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"email": email,
+		"id":    id,
+		"exp":   time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err = token.SignedString([]byte("your_secret_key"))
+	if err != nil {
+		return "", err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err = token.SignedString(jwtKey)
-	return
+	return tokenString, nil
 }
 
 func ParseToken(tokenString string) (*Claims, error) {

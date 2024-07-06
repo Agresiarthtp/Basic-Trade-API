@@ -3,9 +3,9 @@ package controllers
 import (
 	"Basic-Trade-API/helpers"
 	"Basic-Trade-API/models"
-	"Basic-Trade-API/pkg/config"
 	"Basic-Trade-API/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"net/http"
 )
@@ -17,21 +17,30 @@ type AuthController struct {
 func (ac *AuthController) RegisterAdmin(c *gin.Context) {
 	var input models.Admin
 
-	//  check status or validate json of request
+	// Check and parse JSON input
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// hashing password
+	// Create new admin with auto-generated ID
 	input.Password = helpers.HashPass(input.Password)
 
-	err := config.DB.Create(&input).Error
-	if err != nil {
+	admin := models.Admin{
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: helpers.HashPass(input.Password),
+		UUID:     uuid.New(), // Auto-generate a UUID for the new admin
+		// Hash the password before storing it
+	}
+
+	// Create new admin record in the database
+	if err := ac.DB.Create(&admin).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Respond with success message
 	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully!"})
 }
 
@@ -41,32 +50,32 @@ func (ac *AuthController) LoginAdmin(c *gin.Context) {
 		Password string `form:"password" json:"password" binding:"required"`
 	}
 
-	//  check status or validate json of request
+	// Check and parse JSON input
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	var admin models.Admin
-	// validate email
-	err := config.DB.Where("email = ?", input.Email).First(&admin).Error
-	if err != nil {
+	// Query admin record by email
+	if err := ac.DB.Where("email = ?", input.Email).First(&admin).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	//validate password between db and input user
+	// Validate password
 	if !helpers.ComparePass(input.Password, admin.Password) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Password does not match"})
 		return
 	}
 
-	// generate JWT Token
+	// Generate JWT Token
 	token, err := utils.GenerateToken(admin.Email, admin.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Respond with JWT token
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
