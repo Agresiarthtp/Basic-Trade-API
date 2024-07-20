@@ -95,7 +95,7 @@ func (ac *AuthController) LoginAdmin(ctx *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(Admin.Email, Admin.ID)
+	token := utils.GenerateToken(Admin.Email, Admin.ID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

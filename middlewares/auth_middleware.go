@@ -34,8 +34,25 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		//  to validate token and get claims
-		// Menyimpan userID yang diambil dari klaim token ke dalam context untuk digunakan di endpoint selanjutnya
-		c.Set("userID", claims.ID)
+		// Menyimpan userID yang diambil dari claim token ke dalam context untuk digunakan di endpoint selanjutnya
+		c.Set("userData", claims.ID)
 		c.Next()
+	}
+}
+
+func Authentication() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		verifyToken, err := utils.VerifyToken(ctx)
+
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error":   "UnAuthorized",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		ctx.Set("userData", verifyToken)
+		ctx.Next()
 	}
 }
