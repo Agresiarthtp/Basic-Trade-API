@@ -14,68 +14,94 @@ type AuthController struct {
 	DB *gorm.DB
 }
 
-func (ac *AuthController) RegisterAdmin(c *gin.Context) {
-	var input models.Admin
+var (
+	appJSON = "application/json"
+)
 
-	// Check and parse JSON input
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+func (ac *AuthController) RegisterAdmin(ctx *gin.Context) {
+	contentType := helpers.GetContentType(ctx)
+	Admin := models.Admin{}
+
+	if contentType == appJSON {
+		ctx.ShouldBindJSON(&Admin)
+	} else {
+		ctx.ShouldBind(&Admin)
+	}
+
+	// validate if the email already exist
+	var existingAdmin models.Admin
+	err := ac.DB.Where("email = ?", Admin.Email).First(&existingAdmin).Error
+	if err == nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"Error":   "Bad Request!",
+			"message": "Email already in use",
+		})
+		return
+	} else {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"Error":   "Internal Server Error!",
+			"message": "Email already in use",
+		})
+	}
+
+	// Generate a new UUID
+	newUUID := uuid.New()
+	Admin.UUID = newUUID.String() // set the generated UUID as the ID
+
+	err = ac.DB.Create(&Admin).Error
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request!",
+			"message": err.Error(),
+		})
 		return
 	}
 
-	// Create new admin with auto-generated ID
-	input.Password = helpers.HashPass(input.Password)
-
-	admin := models.Admin{
-		Name:     input.Name,
-		Email:    input.Email,
-		Password: helpers.HashPass(input.Password),
-		UUID:     uuid.New(), // Auto-generate a UUID for the new admin
-		// Hash the password before storing it
-	}
-
-	// Create new admin record in the database
-	if err := ac.DB.Create(&admin).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Respond with success message
-	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully!"})
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    Admin,
+	})
 }
 
-func (ac *AuthController) LoginAdmin(c *gin.Context) {
-	var input struct {
-		Email    string `form:"email" json:"email" binding:"required"`
-		Password string `form:"password" json:"password" binding:"required"`
+func (ac *AuthController) LoginAdmin(ctx *gin.Context) {
+	contentType := helpers.GetContentType(ctx)
+	Admin := models.Admin{}
+	var password string
+
+	if contentType == appJSON {
+		ctx.ShouldBindJSON(&Admin)
+	} else {
+		ctx.ShouldBind(&Admin)
 	}
 
-	// Check and parse JSON input
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	password = Admin.Password
 
-	var admin models.Admin
-	// Query admin record by email
-	if err := ac.DB.Where("email = ?", input.Email).First(&admin).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Validate password
-	if !helpers.ComparePass(input.Password, admin.Password) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password does not match"})
-		return
-	}
-
-	// Generate JWT Token
-	token, err := utils.GenerateToken(admin.Email, admin.ID)
+	err := ac.DB.Where("email = ?", Admin.Email).First(&Admin).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(
+			http.StatusUnauthorized, gin.H{
+				"Error":   "Unauthorized",
+				"Message": "Invalid Email.",
+			})
 		return
 	}
 
-	// Respond with JWT token
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	comparePass := helpers.ComparePass([]byte(Admin.Password), []byte(password))
+	if !comparePass {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"Error":   "Unauthorized!",
+			"Message": "Invalid Password.",
+		})
+		return
+	}
+
+	token, err := utils.GenerateToken(Admin.Email, Admin.ID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	// Merespon dengan token JWT
+	ctx.JSON(http.StatusOK, gin.H{"token": token})
 }
