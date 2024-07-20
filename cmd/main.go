@@ -36,30 +36,36 @@ func main() {
 
 	dbConnection.AutoMigrate(&models.Admin{}, &models.Product{}, &models.Product{})
 
-	// create controller
-	r := gin.Default()
-
 	adminController := &controllers.AuthController{DB: dbConnection}
 	productController := &controllers.ProductController{DB: dbConnection}
 	variantController := &controllers.VariantController{DB: dbConnection}
 
-	r.POST("/auth/register", adminController.RegisterAdmin)
-	r.POST("auth//login", adminController.LoginAdmin)
-
-	authorized := r.Group("/")
-	authorized.Use(middlewares.AuthMiddleware())
+	// create controller
+	router := gin.Default()
+	userRouter := router.Group("/auth")
 	{
-		authorized.POST("/products", productController.CreateProduct)                // Create Product
-		authorized.GET("/products", productController.GetProduct)                    // Get All Product
-		authorized.GET("/products/:productUUID", productController.GetProduct)       // Get Product by UUID
-		authorized.PUT("/products/:productUUID", productController.UpdateProduct)    // Update Product by UUID
-		authorized.DELETE("/products/:productUUID", productController.DeleteProduct) // Delete Product by UUID
-
-		authorized.POST("/variants", variantController.CreateVariant)                // Create Variant
-		authorized.GET("/variants", variantController.GetVariant)                    // Get all Variant
-		authorized.GET("/variants/:variantUUID", variantController.GetVariant)       // Get Variant by UUID
-		authorized.PUT("/variants/:variantUUID", variantController.UpdateVariant)    // Update Variant by UUID
-		authorized.DELETE("/variants/:variantUUID", variantController.DeleteVariant) //Delete Variant by UUID
+		userRouter.POST("/register", adminController.RegisterAdmin)
+		userRouter.POST("/login", adminController.LoginAdmin)
 	}
-	r.Run("[::]:8080")
+
+	productRouter := router.Group("/products")
+	{
+		productRouter.GET("/", productController.GetProduct) // Get All Product
+		productRouter.Use(middlewares.Authentication())
+
+		productRouter.POST("/", productController.CreateProduct)               // Create Product
+		productRouter.GET("/:productUUID", productController.GetProduct)       // Get Product by UUID
+		productRouter.PUT("/:productUUID", productController.UpdateProduct)    // Update Product by UUID
+		productRouter.DELETE("/:productUUID", productController.DeleteProduct) // Delete Product by UUID
+	}
+
+	variantRouter := router.Group("/variants")
+	{
+		variantRouter.POST("/", variantController.CreateVariant)               // Create Variant
+		variantRouter.GET("/", variantController.GetVariant)                   // Get all Variant
+		variantRouter.GET("/:variantUUID", variantController.GetVariant)       // Get Variant by UUID
+		variantRouter.PUT("/:variantUUID", variantController.UpdateVariant)    // Update Variant by UUID
+		variantRouter.DELETE("/:variantUUID", variantController.DeleteVariant) //Delete Variant by UUID
+		router.Run("[::]:8080")
+	}
 }

@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"Basic-Trade-API/helpers"
 	"Basic-Trade-API/models"
-	"Basic-Trade-API/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"net/http"
 )
@@ -13,45 +15,53 @@ type ProductController struct {
 }
 
 func (pc *ProductController) CreateProduct(c *gin.Context) {
-	var input models.Product
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	userData := c.MustGet("userData").(jwt.MapClaims)
+	contentType := helpers.GetContentType(c)
+
+	Product := models.Product{}
+	userID := uint(userData["id"].(float64))
+
+	if contentType == appJSON {
+		c.ShouldBindJSON(&Product)
+	} else {
+		c.ShouldBind(&Product)
 	}
 
-	file, _ := c.FormFile("file")
-	filePath := "./" + file.Filename
-	c.SaveUploadedFile(file, filePath)
+	Product.ID = userID
+	newUUID := uuid.New()
+	Product.UUID = newUUID.String()
 
-	url, err := utils.UploadToCloudinary(filePath)
+	err := pc.DB.Create(&Product).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	input.ImageURL = url
-
-	if err := pc.DB.Create(&input).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request!",
+			"message": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"data": input})
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Product Created",
+		"product": Product,
+	})
 }
 
 func (pc *ProductController) GetProduct(c *gin.Context) {
-	var products []models.Product
-	if err := pc.DB.Find(&products).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	results := []models.Product{}
+
+	err := pc.DB.Find(&results).Error
+	//err := db.Debug().Preload("User").Find(&results).Error
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad request",
+			"message": err.Error(),
+		})
 		return
 	}
 
-	// add handler to get product by UUID
-	if err := pc.DB.First(&products, "id = ?", c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": products})
+	c.JSON(http.StatusOK, gin.H{
+		"data": results,
+	})
 }
 
 func (pc *ProductController) UpdateProduct(c *gin.Context) {
