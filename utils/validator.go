@@ -17,7 +17,7 @@ func ValidateToken(signedToken string) (claims *JWTClaim, err error) {
 		signedToken,
 		&JWTClaim{},
 		func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return secretKey, nil
 		},
 	)
 	if err != nil {
